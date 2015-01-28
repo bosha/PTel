@@ -1,6 +1,6 @@
 # PTel
 Yet another implementation of Telnet protocol written using PHP.
-This class created && used for my daily use cases, so it can contains bugs. If you found them - open issue, or fill free to contact with me.
+This class created && used for my daily use cases, so it can contains bugs. If you found them - open issue, or feel free to contact with me.
 
 ## Installation
 Right now - no composer support, but I will add later. So for now, you need to navigate to location of your project, and clone repository:
