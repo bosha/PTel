@@ -74,7 +74,12 @@ class PTel
         /**
          * @var int  Telnet timeout while waiting new data
          */
-        $_timeout = 18000;
+        $_timeout = 18000,
+
+        /**
+         * $var bool  Determine to enable/disable telnet negotiation
+         */
+        $_enableNegotiation = true;
 
     public
 
@@ -138,17 +143,19 @@ class PTel
         stream_set_timeout($this->_sock, 0, $this->_timeout);
         stream_set_blocking($this->_sock, $this->_blocking);
 
-        $topts =  TEL_IAC.TEL_DO.TEL_GA.         // DO Go ahead
-                  TEL_IAC.TEL_WILL.TEL_TTYPE.    // WILL Terminal type
-                  TEL_IAC.TEL_WILL.TEL_NAWS.     // WILL Negotiate about window size
-                  TEL_IAC.TEL_WILL.TEL_TSPEED.   // WILL Terminal speed
-                  TEL_IAC.TEL_WILL.TEL_RFLOW.    // WILL Remote flow control
-                  TEL_IAC.TEL_WILL.TEL_LINEMODE. // WILL Linemode
-                  TEL_IAC.TEL_WILL.TEL_NEWENV.   // WILL New environment
-                  TEL_IAC.TEL_DO.TEL_STATUS.     // DO Status
-                  TEL_IAC.TEL_WILL.TEL_XDISPLOC; // WILL X Display location
+        if ($this->_enableNegotiation) {
+            $topts =  TEL_IAC.TEL_DO.TEL_GA.         // DO Go ahead
+                      TEL_IAC.TEL_WILL.TEL_TTYPE.    // WILL Terminal type
+                      TEL_IAC.TEL_WILL.TEL_NAWS.     // WILL Negotiate about window size
+                      TEL_IAC.TEL_WILL.TEL_TSPEED.   // WILL Terminal speed
+                      TEL_IAC.TEL_WILL.TEL_RFLOW.    // WILL Remote flow control
+                      TEL_IAC.TEL_WILL.TEL_LINEMODE. // WILL Linemode
+                      TEL_IAC.TEL_WILL.TEL_NEWENV.   // WILL New environment
+                      TEL_IAC.TEL_DO.TEL_STATUS.     // DO Status
+                      TEL_IAC.TEL_WILL.TEL_XDISPLOC; // WILL X Display location
 
-        $this->send($topts, false);
+            $this->send($topts, false);
+        }
     }
 
     /**
@@ -224,7 +231,7 @@ class PTel
         if (!$this->_sock) { throw new SocketClientException("Connection gone!"); }
         $char = fgetc($this->_sock);
         if ($this->stream_eof()) { return false; }
-        if ($char === TEL_IAC) {
+        if ($char === TEL_IAC && $this->_enableNegotiation) {
             $this->_negotiate(fgetc($this->_sock));
             return "";
         }
@@ -548,6 +555,16 @@ class PTel
      * @return string   Prompt
      */
     public function getPrompt() { return $this->prompt; }
+
+    /**
+     * Disable telnet negotiation (will send/recive as plain text)
+     *
+     * @return PTel   Current class instance
+     */
+    public function disableNegotiation() {
+        $this->_enableNegotiation = false;
+        return $this;
+    }
 
     /**
     * Closing socket
