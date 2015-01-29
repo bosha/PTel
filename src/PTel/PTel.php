@@ -547,7 +547,7 @@ class PTel
      *
      * @param string    $prompt     Prompt
      */
-    public function setPrompt($prompt) { $this->prompt($prompt); }
+    public function setPrompt($prompt) { $this->prompt = $prompt; }
 
     /**
      * Return currently used prompt
