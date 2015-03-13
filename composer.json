@@ -1,5 +1,5 @@
 {
-    "name": "bosha/PTel",
+    "name": "bosha/ptel",
     "description": "PHP telnet with negotiation support",
     "keywords": ["remote", "expect", "cisco", "network", "telnet"],
     "type": "library",
