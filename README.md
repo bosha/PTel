@@ -3,7 +3,36 @@ Yet another implementation of Telnet protocol written using PHP.
 This class created && used for my daily use cases, so it can contains bugs. If you found them - open issue, or feel free to contact with me.
 
 ## Installation
-Right now - no composer support, but I will add later. So for now, you need to navigate to location of your project, and clone repository:
+
+### Composer
+
+Inside your root folder with project run following command:
+
+```bash
+composer require "bosha/ptel": "dev-master"
+```
+
+Or manually add to your composer.json:
+
+```json
+"require": {
+    "bosha/ptel": "dev-master"
+}
+```
+
+And use it:
+
+```php
+<?php
+
+require_once(__DIR__."/../vendor/autoload.php");
+
+$telnet = new PTel\PTel();
+```
+
+### Manually
+
+Navigate to location of your project, and run following commands:
 
 ```bash
 git clone https://github.com/bosha/PTel.git
