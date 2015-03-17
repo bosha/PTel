@@ -2,8 +2,8 @@
 
 namespace PTel;
 
-use TelnetException,
-    SocketClientException;
+use PTel\TelnetException,
+    PTel\SocketClientException;
 
 define('TEL_IAC', chr(255)); // Interpret as command
 define('TEL_DO', chr(253)); // Use option
@@ -36,6 +36,7 @@ class PTel
 
     private
 
+        /**
         /**
          * Connection handler
          */
@@ -186,7 +187,7 @@ class PTel
                 throw new TelnetException("Username or password wrong! Login failed");
             }
 
-            if (preg_match("/(#|>)/", $buff)) {
+            if (preg_match("/(#|>|\$)/", $buff)) {
                 break;
             }
 
@@ -282,6 +283,24 @@ class PTel
     */
     public function find($str) {
         while ($line = $this->recvLine()) {
+            if (preg_match("/{$str}/", $line, $matches)) {
+                return $matches[0];
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Receive all data, and search through global buffer
+     *
+     * @param string    $str    String to search (regex supported)
+     *
+     * @return bool|string  False if not found, string contains search
+     */
+    public function findAll($str) {
+        $this->recvAll();
+        $output_as_array = explode($this->retcarriage, $this->getBuffer());
+        foreach ($output_as_array as $line) {
             if (preg_match("/{$str}/", $line, $matches)) {
                 return $matches[0];
             }
