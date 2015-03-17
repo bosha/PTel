@@ -199,7 +199,7 @@ class PTel
         $lines = explode("\n", $this->getBuffer());
         $prompt = array_slice($lines, -1);
         $this->prompt = $prompt[0];
-        return true;
+        return $this;
     }
 
     /**
