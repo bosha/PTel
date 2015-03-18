@@ -48,26 +48,6 @@ class PTel
         $_buff = null,
 
         /**
-         * @var string  Temporary global buffer with socket output
-         */
-        $_tmpbuff = null,
-
-        /**
-         * @var int  Inbound Terminal speed
-         */
-         $_tspeed_in = '38000',
-
-        /**
-         * @var int  Outbound Terminal speed
-         */
-         $_tspeed_out = '38000',
-
-        /**
-         * @var string  Default terminal type
-         */
-         $_termtype = 'xterm',
-
-        /**
          * @var bool  Set blocking/non-blocking modes
          */
         $_blocking = true,
@@ -75,25 +55,49 @@ class PTel
         /**
          * @var int  Telnet timeout while waiting new data
          */
-        $_timeout = 18000,
+        $_timeout = 18000;
+
+    public
 
         /**
          * $var bool  Determine to enable/disable telnet negotiation
          */
-        $_enableNegotiation = true;
+        $negotiation_enabled = true,
 
-    public
+        /**
+         * @var int  Inbound Terminal speed
+         */
+        $terminal_speed_in = '38000',
+
+        /**
+         * @var int  Outbound Terminal speed
+         */
+        $terminal_speed_out = '38000',
+
+        /**
+         * @var string  Default terminal type
+         */
+        $terminal_type = 'xterm',
+
+        /**
+         * @var int Height of window size
+         */
+        $window_size_height = 35,
+
+        /**
+         * @var int Width of window size
+         */
+        $window_size_width = 120,
 
         /**
          * @var string  Return carriage symbols
          */
         $retcarriage = "\n",
 
-
         /**
          * @var string  Page delimiters
          */
-        $page_delimiter = "(ctrl\+C|--more--|quit\))",
+        $page_delimiter = "(ctrl\+C|--[mM]ore--|quit\))",
 
         /**
          * @var string  Telnet prompt
@@ -120,6 +124,8 @@ class PTel
      *
      * @throws  SocketClientException   On socket connection error
      * @throws  TelnetException         On error while resolving IP-address
+     *
+     * @return  $this   Current class instance
      */
     public function connect($host, $port = null, $timeout = null) {
 
@@ -144,7 +150,7 @@ class PTel
         stream_set_timeout($this->_sock, 0, $this->_timeout);
         stream_set_blocking($this->_sock, $this->_blocking);
 
-        if ($this->_enableNegotiation) {
+        if ($this->negotiation_enabled) {
             $topts =  TEL_IAC.TEL_DO.TEL_GA.         // DO Go ahead
                       TEL_IAC.TEL_WILL.TEL_TTYPE.    // WILL Terminal type
                       TEL_IAC.TEL_WILL.TEL_NAWS.     // WILL Negotiate about window size
@@ -157,6 +163,8 @@ class PTel
 
             $this->send($topts, false);
         }
+
+        return $this;
     }
 
     /**
@@ -167,13 +175,13 @@ class PTel
      *
      * @throws  TelnetException         On wrong username/password
      * @throws  SocketClientException   On socket communication error
-     * @return  bool                    True on success login
+     * @return  $this                   Current instance on success
      */
     public function login($user, $pass, $maxtimeout = 10) {
         try {
             $this->expect('((U|u)ser|(L|l)ogin)((N|n)ame|)(:|)', $user);
             $this->expect('(P|p)ass((W|w)ord|)(:|)', $pass);
-        } catch (Exception $e) {
+        } catch (TelnetException $e) {
             throw new TelnetException('Could not find password request. Login failed.');
         }
 
@@ -196,6 +204,7 @@ class PTel
             }
         }
 
+        $this->recvAll();
         $lines = explode("\n", $this->getBuffer());
         $prompt = array_slice($lines, -1);
         $this->prompt = $prompt[0];
@@ -232,7 +241,7 @@ class PTel
         if (!$this->_sock) { throw new SocketClientException("Connection gone!"); }
         $char = fgetc($this->_sock);
         if ($this->stream_eof()) { return false; }
-        if ($char === TEL_IAC && $this->_enableNegotiation) {
+        if ($char === TEL_IAC && $this->negotiation_enabled) {
             $this->_negotiate(fgetc($this->_sock));
             return "";
         }
@@ -314,13 +323,14 @@ class PTel
      * @param    string  $str        String/regexp for search
      * @param    string  $cmd        Command to send
      * @param    bool    $newline    Send new line character
+     * @param    int     $maxtimeout Maximum timeout for waiting sought string
      *
      * @throws   SocketClientException   On socket communication error
      * @throws   TelnetException         If wait timeout is reached
      * @return   bool    True on search and send success, false otherwise
      */
-    public function expect($str, $cmd, $newline = true) {
-        if ($this->waitFor($str)) {
+    public function expect($str, $cmd, $newline = true, $maxtimeout = 10) {
+        if ($this->waitFor($str, $maxtimeout)) {
             $this->send($cmd, $newline);
             return true;
         }
@@ -376,8 +386,13 @@ class PTel
 
     /**
      * Clear global buffer
+     *
+     * @return  $this   Current class instance
      */
-    public function clearBuffer() { $this->_buff = null; }
+    public function clearBuffer() {
+        $this->_buff = null;
+        return $this;
+    }
 
     /**
      * Telnet negotiation method. Run appropriate method based on type of
@@ -407,7 +422,7 @@ class PTel
     private function _negotiateDo($cmd) {
         switch ($cmd) {
             case TEL_TTYPE: // Send terminal type
-                $term = (binary) $this->_termtype;
+                $term = (binary) $this->terminal_type;
                 return $this->send(TEL_IAC.TEL_SUB.TEL_TTYPE.TEL_BIN.$term.
                             TEL_IAC.TEL_SUBEND,false);
             case TEL_XDISPLOC: // Send display location
@@ -419,9 +434,15 @@ class PTel
                 return $this->send(TEL_IAC.TEL_SUB.TEL_NEWENV.TEL_BIN.$env.
                             TEL_IAC.TEL_SUBEND, false);
             case TEL_TSPEED: // Send terminal speed
-                $tspeed = (binary) $this->_tspeed_in . ','. $this->_tspeed_out;
+                $tspeed = (binary) $this->terminal_speed_in . ','. $this->terminal_speed_out;
                 return $this->send(TEL_IAC.TEL_SUB.TEL_TSPEED.TEL_BIN.$tspeed.
                             TEL_IAC.TEL_SUBEND, false);
+            case TEL_NAWS: // Negotiate about window size
+                $null = chr(0);
+                $height = chr($this->window_size_height);
+                $width = chr($this->window_size_width);
+                return $this->send(TEL_IAC.TEL_SUB.TEL_NAWS.$null.$width.$null.$height.
+                    TEL_IAC.TEL_SUBEND, false);
             case TEL_GA:
                 break;
             case TEL_ECHO: // This is workaround for some strange thing
@@ -477,8 +498,8 @@ class PTel
     /**
      * Wait for specified message from socket till timeout
      *
-     * @param str   $str            String to wait
-     * @param int   $maxtimeout     Maximum timeout to wait
+     * @param string    $str            String to wait
+     * @param int       $maxtimeout     Maximum timeout to wait
      *
      * @throws  SocketClientException    On socket communication error
      * @throws  TelnetException          If maxtimeout reached
@@ -547,26 +568,66 @@ class PTel
     * Set terminal type
     *
     * @param    string  $term   Terminal type
+     *
+     * @return  $this   Current class instance
     */
-    public function setTerm($term) { $this->_termtype = $term; }
+    public function setTerm($term) {
+        $this->terminal_type = $term;
+        return $this;
+    }
 
     /**
     * Setting terminal speed
     *
     * @param    string  $in     String with inbound terminal speed
     * @param    string  $out    String with outbound terminal speed
+     *
+     * @return  $this   Instance of current class
     */
     public function setTermSpeed($in, $out) {
-        $this->_tspeed_in = $in;
-        $this->_tspeed_out = $out;
+        $this->terminal_speed_in = $in;
+        $this->terminal_speed_out = $out;
+
+        return $this;
+    }
+
+    /**
+     * Window size used while negotiating
+     *
+     * @param int $height   Window height
+     * @param int $width    Window width
+     *
+     * @throws  TelnetException         On wrong parameter specified
+     * @throws  SocketClientException   On socket communication error
+     *
+     * @return $this    Instance of current class
+     */
+    public function setWindowSize($height, $width) {
+        if (!is_int($height) || !is_int($width)) {
+            throw new TelnetException("Wrong windows height or width used. Should valid integer.");
+        }
+
+        if ($height < 1 || $width < 1 || $height === 255 || $width === 255) {
+            throw new TelnetException("Window size can't be negative or 255");
+        }
+
+        $this->winsize_height = $height;
+        $this->winsize_widht = $width;
+
+        return $this;
     }
 
     /**
      * Set the prompt manually
      *
      * @param string    $prompt     Prompt
+     *
+     * @return  $this   Current class instance
      */
-    public function setPrompt($prompt) { $this->prompt = $prompt; }
+    public function setPrompt($prompt) {
+        $this->prompt = $prompt;
+        return $this;
+    }
 
     /**
      * Return currently used prompt
@@ -576,23 +637,26 @@ class PTel
     public function getPrompt() { return $this->prompt; }
 
     /**
-     * Disable telnet negotiation (will send/recive as plain text)
+     * Disable telnet negotiation (will send/recieve as plain text)
      *
      * @return PTel   Current class instance
      */
     public function disableNegotiation() {
-        $this->_enableNegotiation = false;
+        $this->negotiation_enabled = false;
         return $this;
     }
 
     /**
     * Closing socket
+     *
+     * @return $this    Current class instance
     */
     public function disconnect() {
         if ($this->_sock) {
             fclose($this->_sock);
             $this->_sock = null;
         }
+        return $this;
     }
 
     /**
